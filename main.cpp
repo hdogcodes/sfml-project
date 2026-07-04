@@ -31,16 +31,22 @@ public:
         window.draw(shape);
     }
 
+
+
+
 };
 class Player {
 public:
     double x;
     double y;
+    float radius;
     sf::Color color;
     sf::CircleShape shape;
+    std::vector<Obstacle> obsticals;
 
-    Player(double x_, double y_, sf::Color color_, float radius = 20.f)
-        : x(x_), y(y_), color(color_)
+
+    Player(double x_, double y_,float radius_, sf::Color color_, std::vector<Obstacle> obsticals_)
+        : x(x_), y(y_),  radius(radius_), color(color_), obsticals(obsticals_)
     {
         shape.setRadius(radius);
         shape.setOrigin({radius, radius}); // center origin
@@ -62,67 +68,13 @@ public:
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
             shape.move({0.f, -0.2f});
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
             shape.move({0.f, 0.2f});
         }
         sf::Vector2f pos = shape.getPosition();
         x = pos.x;
         y = pos.y;
-
-        return pos;
-
-    }
-
-
-};
-
-
-
-
-int main() {
-    sf::RenderWindow window(sf::VideoMode({900u, 600u}), "SFML Test");
-    unsigned int width = 600;
-    unsigned int height = 360;
-
-    std::vector<Obstacle> stuff;
-    for (int i = 0 ; i < 50 ; i++) {
-        Obstacle thing(rand() %900, rand() %600, sf::Color(0,0,255));
-        stuff.push_back(thing);
-    }
-
-
-    sf::CircleShape shape(50.f);
-    shape.setOrigin({50.f, 50.f});
-    shape.setPosition({450.f, 300.f});
-    shape.setFillColor(sf::Color(100, 250, 50));
-
-    sf::CircleShape circle(64.f);
-    circle.setOrigin(circle.getGeometricCenter());
-    circle.setPosition({width / 2.0f, height / 2.0f});
-    circle.setFillColor(sf::Color::Red );
-    circle.setPointCount(35);
-    double prev_x;
-    double prev_y;
-
-    while (window.isOpen()) {
-        while (const std::optional event = window.pollEvent()) {
-            if (event->is<sf::Event::Closed>())
-                window.close();
-        }
-        sf::Vector2f pos = shape.getPosition();
-        sf::Vector2f pos_circle = circle.getPosition();
-
-
-        if (std::pow((pos.x-300),2) + std::pow((pos.y-180),2) <= std::pow((115),2)){
-            pos.x = prev_x;
-            pos.y = prev_y;
-            std::cout << "in" <<"\n";
-        }
-
-
-
-
-        // bounds
+        //boundry
         if (pos.x < 0) {
             pos.x = 0;
         } else if (pos.x > 900) {
@@ -133,34 +85,73 @@ int main() {
         } else if (pos.y > 600) {
             pos.y = 600;
         }
+
         shape.setPosition(pos);
+        return pos;
+
+    }
+
+    sf::Vector2f check_collisions(float x_prev, float y_prev) {
+        for (auto& stuff :obsticals) {
+            double dx = stuff.x - x;
+            double dy = stuff.y - y;
+            double minDist = radius + stuff.shape.getRadius();
+            if ((dx*dx + dy*dy) <= minDist) {
+                x = x_prev;
+                y = y_prev;
+                shape.setPosition({static_cast<float>(x), static_cast<float>(y)});
+                break;
+            }
+
+        }
+        return sf::Vector2f(static_cast<float>(x), static_cast<float>(y));
+    }
+};
 
 
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
-            shape.move({0.2f, 0.f});
 
+int main() {
+    sf::RenderWindow window(sf::VideoMode({900u, 600u}), "SFML Test");
+    unsigned int width = 600;
+    unsigned int height = 360;
+
+
+
+    //render obstitalcs
+    std::vector<Obstacle> stuff;
+    for (int i = 0 ; i < 50 ; i++) {
+        Obstacle thing(rand() %900, rand() %600, sf::Color(0,0,255));
+        stuff.push_back(thing);
+    }
+
+    // render the player
+    Player p(150, 150, 40.f, sf::Color(0,255,0), stuff);
+
+
+    double prev_x = p.x;
+    double prev_y = p.y;
+
+    while (window.isOpen()) {
+        while (const std::optional event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>())
+                window.close();
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
-            shape.move({0.f, -0.2f});
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
-            shape.move({0.f, 0.2f});
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
-            shape.move({-0.2f, 0.f});
-        }
+        prev_x = p.x;
+        prev_y = p.y;
+        //player movement
+        p.move_ment();
+        p.check_collisions(static_cast<float>(prev_x), static_cast<float>(prev_y));
+
 
         window.clear();
-
+        p.draw_player(window);
         for ( auto& dude: stuff) {
             dude.draw(window);
         }
-        window.draw(shape);
-        window.draw(circle);
+
         window.display();
-        prev_x = pos.x;
-        prev_y = pos.y;
+
     }
     return 0;
 }
