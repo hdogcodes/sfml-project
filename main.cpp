@@ -75,15 +75,15 @@ public:
         x = pos.x;
         y = pos.y;
         //boundry
-        if (pos.x < 0) {
-            pos.x = 0;
-        } else if (pos.x > 900) {
-            pos.x = 900;
+        if (pos.x <  radius) {
+            pos.x = radius;
+        } else if (pos.x > 900-radius) {
+            pos.x = 900-radius;
         }
-        if (pos.y < 0) {
-            pos.y = 0;
-        } else if (pos.y > 600) {
-            pos.y = 600;
+        if (pos.y < 0+ radius) {
+            pos.y = radius;
+        } else if (pos.y > 600 -radius) {
+            pos.y = 600 - radius;
         }
 
         shape.setPosition(pos);
@@ -96,9 +96,11 @@ public:
             double dx = stuff.x - x;
             double dy = stuff.y - y;
             double minDist = radius + stuff.shape.getRadius();
-            if ((dx*dx + dy*dy) <= minDist) {
+            if ((dx*dx + dy*dy) <= minDist*minDist) {
                 x = x_prev;
                 y = y_prev;
+                dx = -dx;
+                dy = -dy;
                 shape.setPosition({static_cast<float>(x), static_cast<float>(y)});
                 break;
             }
@@ -113,8 +115,6 @@ public:
 
 int main() {
     sf::RenderWindow window(sf::VideoMode({900u, 600u}), "SFML Test");
-    unsigned int width = 600;
-    unsigned int height = 360;
 
 
 
