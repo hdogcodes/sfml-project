@@ -39,14 +39,18 @@ class Player {
 public:
     double x;
     double y;
+    double dx_p;
+    double dy_p;
+    double decay;
     float radius;
     sf::Color color;
     sf::CircleShape shape;
     std::vector<Obstacle> obsticals;
 
 
-    Player(double x_, double y_,float radius_, sf::Color color_, std::vector<Obstacle> obsticals_)
-        : x(x_), y(y_),  radius(radius_), color(color_), obsticals(obsticals_)
+
+    Player(double x_, double y_, double dx_p_, double dy_p_, double decay_, float radius_, sf::Color color_, std::vector<Obstacle> obsticals_)
+        : x(x_), y(y_), dx_p(dx_p_), dy_p(dy_p_), decay(decay_), radius(radius_), color(color_), obsticals(obsticals_)
     {
         shape.setRadius(radius);
         shape.setOrigin({radius, radius}); // center origin
@@ -59,48 +63,68 @@ public:
         window.draw(shape);
     }
     sf::Vector2f move_ment() {
+        sf::Vector2f pos = shape.getPosition();
+
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
-            shape.move({0.2f, 0.f});
+            dx_p += 0.002;
         }
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
-            shape.move({-0.2f, 0.f});
+            dx_p -= 0.002;
         }
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
-            shape.move({0.f, -0.2f});
+            dy_p -= 0.002;
         }
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
-            shape.move({0.f, 0.2f});
+            dy_p += 0.002;
         }
-        sf::Vector2f pos = shape.getPosition();
-        x = pos.x;
-        y = pos.y;
-        //boundry
-        if (pos.x <  radius) {
+
+        // friction: glide to a stop when no key is held
+        dx_p *= (1 - decay);
+        dy_p *= (1 - decay);
+
+        // cap speed at 4, keep direction
+        double speed_mag = std::hypot(dx_p, dy_p);
+        if (speed_mag > 4) {
+            dx_p *= 4 / speed_mag;
+            dy_p *= 4 / speed_mag;
+        }
+
+        // apply velocity to position
+        pos.x += static_cast<float>(dx_p);
+        pos.y += static_cast<float>(dy_p);
+
+        // boundary: clamp and kill velocity on the axis you hit
+        if (pos.x < radius) {
             pos.x = radius;
-        } else if (pos.x > 900-radius) {
-            pos.x = 900-radius;
+            dx_p = 0;
+        } else if (pos.x > 900 - radius) {
+            pos.x = 900 - radius;
+            dx_p = 0;
         }
-        if (pos.y < 0+ radius) {
+        if (pos.y < radius) {
             pos.y = radius;
-        } else if (pos.y > 600 -radius) {
+            dy_p = 0;
+        } else if (pos.y > 600 - radius) {
             pos.y = 600 - radius;
+            dy_p = 0;
         }
 
         shape.setPosition(pos);
+        x = pos.x;   // keep members in sync check_collisions reads these
+        y = pos.y;
         return pos;
-
     }
 
     sf::Vector2f check_collisions(float x_prev, float y_prev) {
-        for (auto& stuff :obsticals) {
+        for (auto& stuff : obsticals) {
             double dx = stuff.x - x;
             double dy = stuff.y - y;
             double minDist = radius + stuff.shape.getRadius();
             if ((dx*dx + dy*dy) <= minDist*minDist) {
                 x = x_prev;
                 y = y_prev;
-                dx = -dx;
-                dy = -dy;
+                dx_p = -dx_p * 0.01;
+                dy_p = -dy_p * 0.01;
                 shape.setPosition({static_cast<float>(x), static_cast<float>(y)});
                 break;
             }
@@ -126,7 +150,7 @@ int main() {
     }
 
     // render the player
-    Player p(150, 150, 40.f, sf::Color(0,255,0), stuff);
+    Player p(150, 150, 0, 0, 0.02, 40.f, sf::Color(0,255,0), stuff);
 
 
     double prev_x = p.x;
