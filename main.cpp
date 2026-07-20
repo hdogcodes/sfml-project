@@ -1,5 +1,6 @@
 #include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
+
 #include <iostream>
 #include <cmath>
 #include <random>
@@ -43,14 +44,12 @@ public:
     double dy_p;
     double decay;
     float radius;
+    int score;
     sf::Color color;
     sf::CircleShape shape;
-    std::vector<Obstacle> obsticals;
 
-
-
-    Player(double x_, double y_, double dx_p_, double dy_p_, double decay_, float radius_, sf::Color color_, std::vector<Obstacle> obsticals_)
-        : x(x_), y(y_), dx_p(dx_p_), dy_p(dy_p_), decay(decay_), radius(radius_), color(color_), obsticals(obsticals_)
+    Player(double x_, double y_, double dx_p_, double dy_p_, double decay_, float radius_, int score_, sf::Color color_)
+        : x(x_), y(y_), dx_p(dx_p_), dy_p(dy_p_), decay(decay_), radius(radius_), score(score_), color(color_)
     {
         shape.setRadius(radius);
         shape.setOrigin({radius, radius}); // center origin
@@ -66,16 +65,16 @@ public:
         sf::Vector2f pos = shape.getPosition();
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
-            dx_p += 0.002;
+            dx_p += 0.2;
         }
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
-            dx_p -= 0.002;
+            dx_p -= 0.2;
         }
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
-            dy_p -= 0.002;
+            dy_p -= 0.2;
         }
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
-            dy_p += 0.002;
+            dy_p += 0.2;
         }
 
         // friction: glide to a stop when no key is held
@@ -115,22 +114,17 @@ public:
         return pos;
     }
 
-    sf::Vector2f check_collisions(float x_prev, float y_prev) {
-        for (auto& stuff : obsticals) {
-            double dx = stuff.x - x;
-            double dy = stuff.y - y;
-            double minDist = radius + stuff.shape.getRadius();
-            if ((dx*dx + dy*dy) <= minDist*minDist) {
-                x = x_prev;
-                y = y_prev;
-                dx_p = -dx_p * 0.01;
-                dy_p = -dy_p * 0.01;
-                shape.setPosition({static_cast<float>(x), static_cast<float>(y)});
+    void check_collisions(std::vector<Obstacle>& obs) {
+        for (size_t i = 0; i < obs.size(); i++) {
+            double dx = obs[i].x - x;
+            double dy = obs[i].y - y;
+            double minDist = radius + obs[i].shape.getRadius();
+            if (dx*dx + dy*dy <= minDist*minDist) {
+                score += 1;
+                obs.erase(obs.begin() + i);
                 break;
             }
-
         }
-        return sf::Vector2f(static_cast<float>(x), static_cast<float>(y));
     }
 };
 
@@ -139,8 +133,7 @@ public:
 
 int main() {
     sf::RenderWindow window(sf::VideoMode({900u, 600u}), "SFML Test");
-
-
+    window.setFramerateLimit(60);
 
     //render obstitalcs
     std::vector<Obstacle> stuff;
@@ -150,22 +143,43 @@ int main() {
     }
 
     // render the player
-    Player p(150, 150, 0, 0, 0.02, 40.f, sf::Color(0,255,0), stuff);
+    Player p(150, 150, 0, 0, 0.02, 40.f, 0, sf::Color(0,255,0));
+    std::string str = std::to_string(p.score);
 
 
-    double prev_x = p.x;
-    double prev_y = p.y;
+    sf::Font font;
+    if (!font.openFromFile("/System/Library/Fonts/Supplemental/Arial.ttf")) {
+        std::cerr << "Error loading font file!" << std::endl;
+        return -1;
+    }
+
+    sf::Text text(font);                     // Associate the font with the text
+    text.setString(str);          // Set the message
+    text.setCharacterSize(24);               // Set size in pixels (not points)
+    text.setFillColor(sf::Color::White);     // Set text color
+    text.setStyle(sf::Text::Bold);           // Set text style (Bold, Italic, etc.)
+    text.setPosition({100.f, 100.f});
+
+
+
+
+
+
 
     while (window.isOpen()) {
         while (const std::optional event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>())
                 window.close();
         }
-        prev_x = p.x;
-        prev_y = p.y;
+        if (stuff.size()< 50) {
+            Obstacle thing(rand() %900, rand() %600, sf::Color(0,0,255));
+            stuff.push_back(thing);
+        }
+        std::string str_ = std::to_string(p.score);
+        text.setString(str_);
         //player movement
         p.move_ment();
-        p.check_collisions(static_cast<float>(prev_x), static_cast<float>(prev_y));
+        p.check_collisions(stuff);
 
 
         window.clear();
@@ -173,6 +187,8 @@ int main() {
         for ( auto& dude: stuff) {
             dude.draw(window);
         }
+        window.draw(text);
+
 
         window.display();
 
