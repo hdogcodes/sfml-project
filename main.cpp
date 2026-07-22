@@ -150,8 +150,7 @@ class attraction_point {
             }
 
             // friction: glide to a stop when no key is held
-            dx_m *= (1 - decay);
-            dy_m *= (1 - decay);
+
 
             // cap speed at 4, keep direction
             double speed_mag = std::hypot(dx_m, dy_m);
@@ -202,10 +201,12 @@ class attraction_point {
                     dx = dx / mag;
                     dy = dy / mag;
                     dude.score = 0;
-                    dude.x += dx * dude.radius* 2;
-                    dude.y += dy * dude.radius* 2;
-                    dude.dx_p = 5*dx;
-                    dude.dy_p = 5*dy;
+                    dude.x += dx * (dude.radius  +2)* 2;
+                    dude.y += dy * (dude.radius  +2 )* 2;
+                    dude.dx_p = 50 * dx;
+                    dude.dy_p = 50 * dy;
+                    dude.shape.setRadius(blobs[i].radius);
+                    blobs[i].shape.setRadius(blobs[i].radius);
                     blobs.push_back(dude);
                 }
             }
@@ -213,9 +214,12 @@ class attraction_point {
 
 
         void attraction() {
-            int speed = 3.5;
+            float baseSpeed  = 4.0f;
+            float baseRadius = 40.f;
+            float k          = 0.44f;
             int n = blobs.size();
             for (int i = 0 ; i < n; i++) {
+                float speed = baseSpeed * std::pow(baseRadius / blobs[i].radius, k);
                 blobs[i].prev_x = blobs[i].x;
                 blobs[i].prev_y = blobs[i].y;
                 float dx =  x - blobs[i].x;
@@ -311,10 +315,10 @@ int main() {
 
         sf::View partialView(sf::FloatRect({thing.x - 450, thing.y - 300}, {900.f, 600.f}));
         text.setPosition({thing.x, thing.y});
-        for (const auto& thing :blobs) {
-            score+= thing.score;
+        for (const auto& bruv :blobs) {
+            score+= bruv.score;
         }
-        text.setString(std::to_string(blobs.empty() ? 0 : blobs[0].score));
+        text.setString(std::to_string(blobs.empty() ? 0 : score));
         score = 0;
         //draw
         window.clear();
