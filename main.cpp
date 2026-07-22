@@ -2,17 +2,9 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <cmath>
+#include <complex>
 #include <random>
 #include <set>
-
-
-
-
-
-
-
-
-
 
 
 
@@ -67,6 +59,8 @@ public:
         shape.setOrigin({radius, radius}); // center origin
         shape.setFillColor(color);
         shape.setPosition({x, y});
+        shape.setOutlineColor(sf::Color::Blue);
+        shape.setOutlineThickness(5.0f);
     }
 
     void draw_player(sf::RenderWindow& window) {
@@ -97,12 +91,15 @@ public:
 Player collision(Player one, Player two) {
     float dx = one.x - two.x;
     float dy = one.y - two.y;
+    float mag = std::hypot(dx,dy);
     float minDist = one.radius + two.radius;
     if (dx*dx + dy*dy <= minDist*minDist) {
-        one.x = one.prev_x;
-        one.y = one.prev_y;
+        float movement_amount = minDist - mag;
+        one.x += (dx * movement_amount)/mag;
+        one.y += (dy * movement_amount)/mag;
         one.dx_p  = -one.dx_p *0.01;
         one.dy_p  = -one.dy_p *0.01;
+
         one.shape.setPosition({one.x, one.y});
         return one;
     }
@@ -118,20 +115,26 @@ class attraction_point {
         float y;
         float dx_m;
         float dy_m;
+        float prev_x;
+        float prev_y;
         float radius;
         double decay;
         std::vector<Player>& blobs;   // reference to main's vector, not a copy
         sf::CircleShape magnet;
-        attraction_point(float x_, float y_ , float dx_m_, float dy_m_,float radius_ , double decay_,std::vector<Player>& blobs_)
-            : x(x_), y(y_), dx_m(dx_m_), dy_m(dy_m_), decay(decay_),radius(radius_),blobs(blobs_)
+        attraction_point(float x_, float y_ , float dx_m_, float dy_m_,float prev_x_, float prev_y_, float radius_ , double decay_,std::vector<Player>& blobs_)
+            : x(x_), y(y_), dx_m(dx_m_), dy_m(dy_m_),prev_x(prev_x_), prev_y(prev_y_), decay(decay_),radius(radius_),blobs(blobs_)
         {
             magnet.setRadius(radius);
             magnet.setOrigin({radius, radius});
             magnet.setPosition({x,y});
 
+
         }
         sf::Vector2f movement_magnet() {
             sf::Vector2f pos = magnet.getPosition();
+
+            prev_x = x;
+            prev_y = y;
 
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
                 dx_m += 0.2;
@@ -183,21 +186,51 @@ class attraction_point {
             return pos;
 
         }
+        void split() {
+            int n = blobs.size();
+            if (n < 8) {
+                for (int i = 0; i < n; i++) {
+                    //pi*r^2= A/2
+                    //r = sqrt(A/(2*pi))
+                    //r = r/sqrt(2)
+                    blobs[i].radius = blobs[i].radius / std::sqrt(2);
+                    Player dude = blobs[i];
+                    //norm the shot vector
+                    float dx = x - prev_x;
+                    float dy = y - prev_y;
+                    float mag = std::hypot(dx,dy);
+                    dx = dx / mag;
+                    dy = dy / mag;
+                    dude.score = 0;
+                    dude.x += dx * dude.radius* 2;
+                    dude.y += dy * dude.radius* 2;
+                    dude.dx_p = 5*dx;
+                    dude.dy_p = 5*dy;
+                    blobs.push_back(dude);
+                }
+            }
+        }
+
+
         void attraction() {
             int speed = 3.5;
             int n = blobs.size();
             for (int i = 0 ; i < n; i++) {
+                blobs[i].prev_x = blobs[i].x;
+                blobs[i].prev_y = blobs[i].y;
                 float dx =  x - blobs[i].x;
                 float dy =  y - blobs[i].y;
                 float mag = std::hypot(dx,dy);
                 if (n > 1) {
                     for (int j = 0; j < n; j++) {
                         if (j == i) continue;
+                        //std::cout << "blob i " <<blobs[i].prev_x << "," << blobs[i].prev_y<< "\n";
+                        //std::cout << blobs[j].prev_x << "," << blobs[j].prev_y<< "\n";
                         blobs[i] = collision(blobs[i], blobs[j]);
                     }
                 }
                 if (mag > 0) {
-                    blobs[i].x += dx/mag * speed ;   // speed is 2
+                    blobs[i].x += dx/mag * speed;
                     blobs[i].y += dy/mag * speed;
                     blobs[i].shape.setPosition({blobs[i].x, blobs[i].y});
                 }
@@ -216,6 +249,7 @@ class attraction_point {
 int main() {
     sf::RenderWindow window(sf::VideoMode({1800u, 1200u}), "SFML Test");
     window.setFramerateLimit(60);
+    window.setKeyRepeatEnabled(false); // one KeyPressed event per physical press
     //window size 900, 600
 
 
@@ -246,17 +280,22 @@ int main() {
     text.setStyle(sf::Text::Bold);           // Set text style (Bold, Italic, etc.)
 
 
-    attraction_point thing(150, 150, 0, 0, 1 ,0.02,blobs);
+    attraction_point thing(150, 150, 0, 0,0,0, 1 ,0.02,blobs);
 
 
-
-
+    int score = 0;
 
     while (window.isOpen()) {
+        bool splitPressed = false;
         while (const std::optional event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>())
                 window.close();
+            if (const auto* key = event->getIf<sf::Event::KeyPressed>()) {
+                if (key->code == sf::Keyboard::Key::Space)
+                    splitPressed = true; // fires ONCE per press, not while held
+            }
         }
+
 
         if (stuff.size()< 50) {
             Obstacle thing(rand() %1800, rand() %1200, sf::Color(0,0,255));
@@ -265,14 +304,18 @@ int main() {
         //update
         thing.movement_magnet();
         thing.attraction();
+        if (splitPressed) thing.split();
         for (auto& agar : blobs) {
             agar.check_collisions(stuff);
         }
 
         sf::View partialView(sf::FloatRect({thing.x - 450, thing.y - 300}, {900.f, 600.f}));
         text.setPosition({thing.x, thing.y});
+        for (const auto& thing :blobs) {
+            score+= thing.score;
+        }
         text.setString(std::to_string(blobs.empty() ? 0 : blobs[0].score));
-
+        score = 0;
         //draw
         window.clear();
         window.setView(partialView);
